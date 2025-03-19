@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 *
 !.gitignore
 !A*/
@@ -18,3 +19,6 @@ python312.dll
 pythonw.exe
 vcruntime140_1.dll
 vcruntime140.dll
+=======
+!A+/
+>>>>>>> 9479886 (Added .gitignore)
