@@ -2,3 +2,5 @@ gensim==4.3.0
 nltk==3.8.1
 scikit-learn==1.2.1
 numpy==1.26.4
+sympy==1.13.3
+pandas==2.2.3
