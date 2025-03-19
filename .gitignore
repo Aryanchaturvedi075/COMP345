@@ -1,7 +1,11 @@
-<<<<<<< HEAD
-*
 !.gitignore
 !A*/
+
+brackets.txt
+test.py
+20000_tweets.txt
+data/GoogleNews-vectors-negative300.bin.gz
+.C345/
 
 DLLs/
 Doc/
@@ -19,6 +23,3 @@ python312.dll
 pythonw.exe
 vcruntime140_1.dll
 vcruntime140.dll
-=======
-!A+/
->>>>>>> 9479886 (Added .gitignore)
