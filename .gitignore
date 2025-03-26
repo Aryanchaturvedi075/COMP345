@@ -6,6 +6,7 @@ test.py
 20000_tweets.txt
 data/GoogleNews-vectors-negative300.bin.gz
 .C345/
+*.bin.gz
 
 DLLs/
 Doc/

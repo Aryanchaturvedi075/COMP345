@@ -35,9 +35,9 @@ class NgramLM:
 		Returns
 		-------
 		"""
-		with open("data/tweets/covid-tweets-2020-08-10-2020-08-21.trigrams.txt") as f:
+		with open("data/tweets/covid-tweets-2020-08-10-2020-08-21.trigrams.txt", encoding="utf-8") as f:
 			lines = f.readlines()
-			for line in lines:
+			for i, line in enumerate(lines):
 				word1, word2, word3, count = line.strip().split()
 				if (word1, word2) not in self.bigram_prefix_to_trigram:
 					self.bigram_prefix_to_trigram[(word1, word2)] = []
@@ -68,10 +68,29 @@ class NgramLM:
 		next_words = []
 		probs = []
 
-		# write your code here
-		pass
+    # Check if the bigram exists in our dictionary
+		if (word1, word2) in self.bigram_prefix_to_trigram:
+			# Get the list of next words and their counts
+			words = self.bigram_prefix_to_trigram[(word1, word2)]
+			weights = self.bigram_prefix_to_trigram_weights[(word1, word2)]
+			
+			# Calculate the total count to get probabilities
+			total_count = sum(weights)
+			
+			# Create a list of (word, probability) tuples
+			word_probs = [(word, count/total_count) for word, count in zip(words, weights)]
+			
+			# Sort by probability in descending order
+			word_probs.sort(key=lambda x: x[1], reverse=True)
+			
+			# Take the top n results
+			top_results = word_probs[:n]
+			
+			# Separate words and probabilities into two lists
+			next_words = [w for w, p in top_results]
+			probs = [p for w, p in top_results]
 
-		return next_words, probs
+			return next_words, probs
 	
 	def sample_next_word(self, word1, word2, n=10):
 		"""
@@ -96,14 +115,33 @@ class NgramLM:
 		next_words = []
 		probs = []
 
-		# write your code here
-		pass
-
+		# Check if the bigram exists in our dictionary
+		if (word1, word2) in self.bigram_prefix_to_trigram:
+			# Get the list of next words and their counts
+			words = self.bigram_prefix_to_trigram[(word1, word2)]
+			weights = self.bigram_prefix_to_trigram_weights[(word1, word2)]
+			
+			# Calculate the total count to get probabilities
+			total_count = sum(weights)
+			
+			# Create probabilities array for numpy sampling
+			probabilities = [count/total_count for count in weights]
+			
+			# Sample without replacement
+			import numpy as np
+			# Limit sample size to available words if less than n
+			sample_size = min(n, len(words))
+			indices = np.random.choice(len(words), size=sample_size, replace=False, p=probabilities)
+			
+			# Get the sampled words and their probabilities
+			next_words = [words[i] for i in indices]
+			probs = [probabilities[i] for i in indices]
+    
 		return next_words, probs
 	
-	def generate_sentences(self, prefix, beam=10, sampler=top_next_word, max_len=20):
+	def generate_sentences(self, prefix, beam=10, sampler=None, max_len=20):
 		"""
-		Generate sentences using beam search.
+		Generate sentences using beam search with log probabilities for numerical stability.
 
 		Parameters
 		----------
@@ -123,18 +161,105 @@ class NgramLM:
 		probs: list
 			The probabilities corresponding to the generated sentences
 		"""
+		import math
 		sentences = []
 		probs = []
-
-		# write your code here
-		pass
-
+		
+		# If sampler is not provided, use top_next_word as default
+		if sampler is None:
+			sampler = self.top_next_word
+			
+		# Process the prefix to get starting words
+		prefix_words = prefix.strip().split()
+		
+		# Need at least 2 words to start
+		if len(prefix_words) < 2:
+			return sentences, probs
+		
+		# Initialize beam search with the given prefix
+		beam_sentences = [prefix_words]
+		beam_log_probs = [0.0]  # Starting log probability of 0 (log(1) = 0)
+		
+		# Continue until all sentences in beam have ended
+		while not all("<EOS>" in sentence for sentence in beam_sentences):
+			# Track candidate extensions for this round
+			candidates = []
+			candidate_log_probs = []
+			
+			# Process each sentence in the current beam
+			for i, sentence in enumerate(beam_sentences):
+				# Skip if sentence already ended
+				if "<EOS>" in sentence:
+					# Keep this completed sentence as a candidate
+					candidates.append(sentence)
+					candidate_log_probs.append(beam_log_probs[i])
+					continue
+					
+				# Count words after the prefix
+				words_after_prefix = len(sentence) - len(prefix_words)
+				
+				# Check if we've reached maximum length
+				if words_after_prefix >= max_len:
+					# Add EOS and don't extend further
+					candidates.append(sentence + ["<EOS>"])
+					candidate_log_probs.append(beam_log_probs[i])
+					continue
+					
+				# Get last two words to predict next word
+				word1, word2 = sentence[-2], sentence[-1]
+				
+				# Get next word predictions using the provided sampler
+				next_words, next_probs = sampler(word1, word2)
+				
+				# If no predictions, end the sentence
+				if not next_words:
+					candidates.append(sentence + ["<EOS>"])
+					candidate_log_probs.append(beam_log_probs[i])
+					continue
+					
+				# Add all extensions to candidates
+				for j, next_word in enumerate(next_words):
+					# Convert probability to log probability to avoid numerical underflow
+					next_log_prob = math.log(next_probs[j]) if next_probs[j] > 0 else float('-inf')
+					
+					# If the next word is <EOS>, add it
+					if next_word == "<EOS>":
+						new_sentence = sentence + [next_word]
+						# Add log probabilities instead of multiplying raw probabilities
+						new_log_prob = beam_log_probs[i] + next_log_prob
+						candidates.append(new_sentence)
+						candidate_log_probs.append(new_log_prob)
+					# Otherwise, check if adding this word would exceed max_len
+					elif words_after_prefix + 1 < max_len:
+						new_sentence = sentence + [next_word]
+						# Add log probabilities instead of multiplying raw probabilities
+						new_log_prob = beam_log_probs[i] + next_log_prob
+						candidates.append(new_sentence)
+						candidate_log_probs.append(new_log_prob)
+					# If adding this word would make the sentence exactly max_len, add EOS
+					elif words_after_prefix + 1 == max_len:
+						new_sentence = sentence + [next_word, "<EOS>"]
+						# Add log probabilities instead of multiplying raw probabilities
+						new_log_prob = beam_log_probs[i] + next_log_prob
+						candidates.append(new_sentence)
+						candidate_log_probs.append(new_log_prob)
+			
+			# If no candidates, break
+			if not candidates:
+				break
+				
+			# Sort candidates by log probability (descending)
+			sorted_indices = sorted(range(len(candidate_log_probs)), key=lambda i: candidate_log_probs[i], reverse=True)
+			
+			# Select top beam candidates
+			beam_sentences = [candidates[i] for i in sorted_indices[:beam]]
+			beam_log_probs = [candidate_log_probs[i] for i in sorted_indices[:beam]]
+		
+		# Convert word lists to sentences and convert log probabilities back to regular probabilities
+		sentences = [' '.join(sentence) for sentence in beam_sentences]
+		probs = [math.exp(log_prob) for log_prob in beam_log_probs]
+		
 		return sentences, probs
-
-
-
-
-
 
 
 #####------------- CODE TO TEST YOUR FUNCTIONS FOR LANGUAGE MODELING
@@ -249,16 +374,72 @@ class Text2SQLParser:
 		----------
 		question: str
 			The question whose label is to be predicted.
-			
+				
 		Returns
 		-------
 		label: str
 			The predicted label.
 		"""
-		# Fill in your code here.
-		label = ""
+		# Convert to lowercase for case-insensitive matching
+		question_lower = question.lower()
 		
-		return label
+		# Define keyword dictionaries with weights for each category
+		# Higher weights for more specific/strong indicators
+		keywords = {
+			"comparison": {
+				"greater than": 2, "less than": 2, "equal to": 2, "more than": 2, "fewer than": 2, 
+				"between": 1.5, "compare": 1, "highest": 1.5, "lowest": 1.5, "maximum": 2, 
+				"minimum": 2, "largest": 1.5, "smallest": 1.5, "where": 1.5, "exceed": 1,
+				"condition": 1.5, "filter": 1.5, "than": 1, "not equal": 2, "whose": 1
+			},
+			
+			"grouping": {
+				"group by": 3, "grouped by": 3, "for each": 2, "per": 1.5, "group": 2,
+				"average of": 2, "sum of": 2, "count of": 2, "grouped": 2, 
+				"categories": 1, "summarize": 1.5, "aggregate": 2, "having": 2,
+				"average": 2, "sum": 2, "count": 2, "total": 1
+			},
+			
+			"ordering": {
+				"order by": 3, "sort by": 3, "arrange by": 3, "rank": 2, "top": 2, 
+				"ascending": 2, "descending": 2, "highest to lowest": 2.5, 
+				"lowest to highest": 2.5, "ordered": 2, "sorted": 2, "order": 1.5, 
+				"sort": 1.5, "arrange": 1.5, "limit": 2, "first": 1.5
+			},
+			
+			"multi_table": {
+				"join": 3, "both tables": 3, "across tables": 3, "multiple tables": 3,
+				"related to": 2, "connection between": 2, "linking": 2, "relationship": 2,
+				"from both": 2, "inner join": 3, "outer join": 3, "left join": 3, 
+				"tables": 1.5, "foreign key": 3, "two tables": 3
+			}
+		}
+		
+		# Calculate score for each category
+		scores = {category: 0 for category in keywords.keys()}
+		
+		# Check for keyword matches and add corresponding weights
+		for category, kw_dict in keywords.items():
+			for kw, weight in kw_dict.items():
+				if kw in question_lower:
+					scores[category] += weight
+		
+		# Get the highest score
+		max_score = max(scores.values())
+		
+		# If no keywords match, default to comparison (typically most common)
+		if max_score == 0:
+			return "comparison"
+		
+		# If there's a tie, implement a priority order
+		# Prioritize more complex operations first
+		if list(scores.values()).count(max_score) > 1:
+			for category in ["multi_table", "grouping", "ordering", "comparison"]:
+				if scores[category] == max_score:
+					return category
+		
+		# Return the category with the highest score
+		return max(scores, key=scores.get)
 
 	def evaluate_accuracy(self, prediction_function_name):
 		"""
@@ -356,9 +537,6 @@ class Text2SQLParser:
 		predicted_label = ""
 
 		return predicted_label
-
-
-
 
 
 
