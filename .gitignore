@@ -10,7 +10,6 @@ tcl/
 *.dll
 
 # Jupyter and Python temp files
-*.ipynb
 *.py[cod]
 __pycache__/
 

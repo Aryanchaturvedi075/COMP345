@@ -6,8 +6,8 @@ Create a virtual environment
 python3 -m venv .venv
 ```
 
-Ensure you're using a version of python<3.13 since python 3.13 doesn't support numpy<2.0.
-Numpy<2.0 is required for gensim to work.
+Ensure you're using a version of python<3.13 since python 3.13 doesn't support numpy<2.0.0
+Numpy<2.0.0 is required for gensim to work.
 
 Install the requirements:
 ```

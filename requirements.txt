@@ -1,0 +1,9 @@
+# Core Python Libraries
+numpy<2.0.0
+pandas
+sympy
+nltk
+gensim
+scikit-learn
+ipykernel
+seaborn
