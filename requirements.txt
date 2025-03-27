@@ -7,3 +7,4 @@ gensim
 scikit-learn
 ipykernel
 seaborn
+statsmodel
