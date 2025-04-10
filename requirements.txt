@@ -8,3 +8,4 @@ scikit-learn
 ipykernel
 seaborn
 statsmodel
+lingpy
