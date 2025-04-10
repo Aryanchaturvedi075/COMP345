@@ -13,3 +13,9 @@ Install the requirements:
 ```
 pip install -r requirements.txt
 ```
+
+To convert ipynb notebooks to pdf:
+```
+pip install nbconvert[webpdf]
+jupyter nbconvert --to webpdf --allow-chromium-download your-notebook-file.ipynb
+```
