@@ -9,3 +9,4 @@ ipykernel
 seaborn
 statsmodel
 lingpy
+nbconvert
